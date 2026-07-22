@@ -1,0 +1,31 @@
+services:
+  pgeverything:
+    build:
+      context: .
+    image: pgeverything:0.1.0
+    container_name: pgeverything
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-pgeverything}
+      PGE_ENABLE_POSTGIS: ${PGE_ENABLE_POSTGIS:-false}
+    # shared_preload_libraries must be set at startup (and during init), so pass it here.
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements
+      - -c
+      - cron.database_name=pgeverything
+      - -c
+      - timescaledb.telemetry_level=off
+    ports:
+      - "${PGE_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pgeverything"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:

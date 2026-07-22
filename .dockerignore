@@ -1,0 +1,10 @@
+.git
+.gitignore
+docs
+test
+README.md
+Makefile
+docker-compose.yml
+*.md
+.env
+.env.*
