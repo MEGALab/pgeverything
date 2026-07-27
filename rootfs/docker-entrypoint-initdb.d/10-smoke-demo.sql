@@ -1,6 +1,11 @@
 -- PGEverything — seed one demo object per capability so a fresh container is
 -- immediately explorable. Safe to drop; purely illustrative.
 
+-- The database default search_path puts ag_catalog first (for AGE); pin unqualified
+-- demo tables to public so they land where a user exploring the container looks.
+-- The graph block below sets its own ag_catalog search_path.
+SET search_path = public;
+
 -- 2. NoSQL / document (JSONB + GIN)
 CREATE TABLE IF NOT EXISTS demo_documents (
     id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -40,3 +45,6 @@ SELECT create_graph('demo_graph');
 SELECT * FROM cypher('demo_graph', $$
     CREATE (:Agent {name: 'scout'})-[:USES]->(:Tool {name: 'postgres'})
 $$) AS (v agtype);
+
+-- 7. Key-value cache (pgcache)
+SELECT cache_set('demo:greeting', '{"msg":"hello from pgcache"}'::jsonb, ttl => 3600);

@@ -1,0 +1,4 @@
+comment = 'Redis-style key-value cache (jsonb values, TTL) for PGEverything.'
+default_version = '0.1.0'
+relocatable = false
+superuser = false

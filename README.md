@@ -2,10 +2,10 @@
 
 **One PostgreSQL 16 image with everything a developer needs to build a modern AI Foundry.**
 
-Instead of running six databases — Postgres, MongoDB, Neo4j, InfluxDB, Redis, Pinecone —
-PGEverything gives you one PostgreSQL server, one port, six workloads. Everything is a
-Postgres extension, so it is all transactional, backed up together, and queried in one SQL
-dialect.
+Instead of running seven databases — Postgres, MongoDB, Neo4j, InfluxDB, Redis, Pinecone,
+plus a cache — PGEverything gives you one PostgreSQL server, one port, seven workloads.
+Everything is a Postgres extension, so it is all transactional, backed up together, and
+queried in one SQL dialect.
 
 | Capability | Powered by |
 |---|---|
@@ -15,6 +15,7 @@ dialect.
 | **Time-series** | TimescaleDB |
 | **Pub/Sub** | pgmq (durable queues) + `LISTEN`/`NOTIFY` |
 | **Vector** | pgvector + pgvectorscale |
+| **Key-value cache** | pgcache (jsonb values, TTL) |
 
 Plus `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_statements`, and optional **PostGIS**.
 
@@ -23,7 +24,7 @@ Plus `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_statements`, and optional **Post
 ```bash
 make build      # build the image (compiles AGE + pgmq)
 make up         # start it, wait for healthy
-make smoke      # verify all six capabilities
+make smoke      # verify all seven capabilities
 make shell      # psql in
 ```
 
@@ -64,6 +65,14 @@ CREATE INDEX ON items USING hnsw (embedding vector_l2_ops);
 SELECT id FROM items ORDER BY embedding <-> '[...]' LIMIT 5;
 ```
 
+**Key-value cache (pgcache)**
+```sql
+SELECT cache_set('user:1', '{"name":"alice"}'::jsonb, ttl => 60);  -- ttl seconds, NULL = forever
+SELECT cache_get('user:1');    -- {"name": "alice"}, or NULL once expired
+SELECT cache_incr('hits');     -- atomic counter, returns new value
+SELECT cache_del('user:1');    -- true if the key existed
+```
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -76,8 +85,9 @@ SELECT id FROM items ORDER BY embedding <-> '[...]' LIMIT 5;
 ## Design
 
 Built on `timescale/timescaledb-ha:pg16` (which bundles TimescaleDB + pgvector +
-pgvectorscale); Apache AGE and pgmq are compiled from source in a builder stage. PostgreSQL
-16 is the highest major where all six extensions have working builds today — Apache AGE is
-the version limiter.
+pgvectorscale); Apache AGE and pgmq are compiled from source in a builder stage, and
+`pgcache` is a first-party pure-SQL extension staged into the image. PostgreSQL 16 is the
+highest major where all the third-party extensions have working builds today — Apache AGE
+is the version limiter.
 
 Full design spec: [docs/specs/v0.1.0.md](docs/specs/v0.1.0.md).

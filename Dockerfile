@@ -56,13 +56,17 @@ RUN git clone --depth 1 --branch "${PGMQ_REF}" https://github.com/tembo-io/pgmq.
 ##############################################################################
 FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.title="PGEverything" \
-      org.opencontainers.image.description="One Postgres for SQL, documents, graph, time-series, pub/sub, and vectors." \
+      org.opencontainers.image.description="One Postgres for SQL, documents, graph, time-series, pub/sub, vectors, and key-value cache." \
       org.opencontainers.image.version="0.1.0"
 
 # Copy compiled extension artifacts (AGE + pgmq) from the builder. The lib and
 # extension dirs are the standard PG16 install locations on this base.
 COPY --from=builder /usr/lib/postgresql/16/lib/ /usr/lib/postgresql/16/lib/
 COPY --from=builder /usr/share/postgresql/16/extension/ /usr/share/postgresql/16/extension/
+
+# pgcache — first-party Redis-style KV cache extension (pure SQL, no compile).
+COPY extensions/pgcache/pgcache.control extensions/pgcache/pgcache--0.1.0.sql \
+     /usr/share/postgresql/16/extension/
 
 # Init scripts + config.
 COPY rootfs/ /
