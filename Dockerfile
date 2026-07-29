@@ -22,6 +22,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # PG16/v1.6.0-rc0 when moving to 1.6.x.
 ARG AGE_REF=PG16/v1.5.0-rc0
 ARG PGMQ_REF=v1.4.4
+# pgjwt has no release tags; pin to a commit on master.
+ARG PGJWT_REF=f3d82fd30151e754e19ce5d6a06c71c20689ce3d
 
 # postgresql-server-dev-16 supplies the server headers (postgres.h, PGXS). The HA
 # base ships the server binaries but NOT these headers; without it AGE/pgmq can't
@@ -51,6 +53,12 @@ RUN git clone --depth 1 --branch "${PGMQ_REF}" https://github.com/tembo-io/pgmq.
  && make PG_CONFIG="$(command -v pg_config)" \
  && make PG_CONFIG="$(command -v pg_config)" install
 
+# --- pgjwt (JWT sign/verify; pure SQL, depends on pgcrypto) ---
+RUN git clone https://github.com/michelp/pgjwt.git /tmp/pgjwt \
+ && cd /tmp/pgjwt \
+ && git checkout "${PGJWT_REF}" \
+ && make PG_CONFIG="$(command -v pg_config)" install
+
 ##############################################################################
 # Stage 2 — final image
 ##############################################################################
@@ -66,6 +74,10 @@ COPY --from=builder /usr/share/postgresql/16/extension/ /usr/share/postgresql/16
 
 # pgcache — first-party Redis-style KV cache extension (pure SQL, no compile).
 COPY extensions/pgcache/pgcache.control extensions/pgcache/pgcache--0.1.0.sql \
+     /usr/share/postgresql/16/extension/
+
+# pgauth — first-party JWT auth + RLS helper extension (pure SQL, no compile).
+COPY extensions/pgauth/pgauth.control extensions/pgauth/pgauth--0.1.0.sql \
      /usr/share/postgresql/16/extension/
 
 # Init scripts + config.

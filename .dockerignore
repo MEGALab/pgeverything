@@ -2,6 +2,7 @@
 .gitignore
 docs
 test
+scripts
 README.md
 Makefile
 docker-compose.yml

@@ -1,0 +1,5 @@
+comment = 'JWT auth + Row-Level-Security helpers (bcrypt via pgcrypto, JWT via pgjwt).'
+default_version = '0.1.0'
+relocatable = false
+superuser = false
+requires = 'pgcrypto, pgjwt'

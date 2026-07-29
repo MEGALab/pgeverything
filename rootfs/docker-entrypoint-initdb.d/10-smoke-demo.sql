@@ -38,6 +38,33 @@ VALUES ('hello', '[1,0,0]'), ('world', '[0,1,0]');
 SELECT pgmq.create('demo_queue');
 SELECT pgmq.send('demo_queue', '{"event":"hello"}');
 
+-- 8. Full-text search (core tsvector + GIN). Created while search_path is still public,
+-- before the graph block below switches to ag_catalog.
+CREATE TABLE IF NOT EXISTS demo_articles (
+    id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    body  text NOT NULL,
+    fts   tsvector GENERATED ALWAYS AS (to_tsvector('english', body)) STORED
+);
+CREATE INDEX IF NOT EXISTS demo_articles_fts_gin ON demo_articles USING gin (fts);
+INSERT INTO demo_articles (body) VALUES
+  ('PostgreSQL powers the modern AI foundry'),
+  ('One database for vectors, graphs, and search');
+
+-- 9. Auth / Row-Level Security — per-user data isolation. owner_id defaults to the
+-- authenticated user (auth.uid()); the policy limits every row to its owner. Apps must
+-- connect as the non-superuser app_user for the policy to apply (superusers bypass RLS).
+CREATE TABLE IF NOT EXISTS notes (
+    id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner_id uuid NOT NULL DEFAULT auth.uid(),
+    body     text NOT NULL
+);
+ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS notes_owner ON notes;
+CREATE POLICY notes_owner ON notes
+    USING (owner_id = auth.uid())
+    WITH CHECK (owner_id = auth.uid());
+GRANT SELECT, INSERT, UPDATE, DELETE ON notes TO app_user;
+
 -- 3. Graph (Apache AGE)
 LOAD 'age';
 SET search_path = ag_catalog, "$user", public;
