@@ -7,7 +7,8 @@ NEW_DB       ?=
 NEW_USER     ?=
 NEW_PASSWORD ?=
 
-.PHONY: build up down logs shell smoke clean create-db
+.PHONY: build up down logs shell smoke clean create-db \
+        replication-enable replicant replicant-smoke replica-status
 
 build:            ## Build the image
 	docker build -t $(IMAGE) .
@@ -43,3 +44,19 @@ create-db:        ## Create an isolated tenant DB + owner role: make create-db N
 	  -v user="$(NEW_USER)" -v pass="$(NEW_PASSWORD)" -v db="$(NEW_DB)" -v maindb="$(DB)" \
 	  -f - < scripts/create-db.sql
 	@echo "Created isolated database '$(NEW_DB)' owned by '$(NEW_USER)' — no access to other databases."
+
+# --- Physical replication (see README "Physical replication") -------------------------
+replication-enable: ## (PRIMARY host) authorize a replica: role + pg_hba + wal_keep_size
+	@bash scripts/replication-enable.sh
+
+replicant:          ## (REPLICA host) set up a streaming replica of a remote primary (prompts)
+	@bash scripts/replicant.sh
+
+replicant-smoke:    ## Verify replication (standby, streaming, read-only, propagation) — separate from `smoke`
+	@bash scripts/replicant-smoke.sh
+
+replica-status:     ## Quick replication status (recovery + wal receiver)
+	@docker compose -f docker-compose.replica.yml exec -T replica \
+	  psql -x -U postgres -d pgeverything \
+	  -c "SELECT pg_is_in_recovery() AS in_recovery;" \
+	  -c "SELECT status, sender_host, sender_port, conninfo IS NOT NULL AS has_conninfo FROM pg_stat_wal_receiver;"
