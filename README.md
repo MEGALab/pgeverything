@@ -50,6 +50,18 @@ default `PUBLIC` `CONNECT` privilege). The container must be running (`make up` 
 > `postgres` superuser still administers every database. Provisioning a tenant also locks
 > the shared databases against `PUBLIC`, keeping `app_user` access to the primary DB intact.
 
+### Replication
+
+Stand up a streaming read-replica on another server:
+
+```bash
+make replication-enable   # on the PRIMARY host: authorize a replica (prompts)
+make replicant            # on the REPLICA host: clone repo, then run this (prompts)
+make replicant-smoke      # verify replication end-to-end (separate from `make smoke`)
+```
+
+Full walkthrough and caveats: [Physical replication (cross-host)](#physical-replication-cross-host).
+
 ## Examples
 
 **Document (JSONB)**
@@ -174,6 +186,40 @@ for role-based policies. (Open registration and 1-hour non-refreshable tokens ar
 > `docker-compose.yml` (and `rootfs/postgresql.conf.d/pgeverything.conf`) to the same value.
 > pg_cron requires them to match — otherwise first-boot init fails with
 > *"CREATE EXTENSION pg_cron must be run in the database named by cron.database_name"*.
+
+## Physical replication (cross-host)
+
+Run a second PGEverything container as an **asynchronous streaming read-replica** of a primary
+running on another server. Two steps, two hosts:
+
+**1. On the primary host** — authorize replication (idempotent, no restart):
+```bash
+make replication-enable      # prompts for the replica's CIDR + a replication password
+```
+This creates a `replicator` role, opens a `pg_hba` rule for the replica's network, and sets a
+`wal_keep_size` buffer. Make sure the primary's Postgres port (`5432`) is reachable from the
+replica (firewall).
+
+**2. On the replica host** — clone this repo, then:
+```bash
+make replicant               # prompts for primary host/port/user/password + replica port
+```
+It writes the answers to `.env`, builds the image, and starts `pgeverything-replica`, which
+`pg_basebackup`s from the primary on first boot and comes up as a hot standby.
+
+**Verify** (separate from the single-node `make smoke`):
+```bash
+make replicant-smoke         # standby? streaming? read-only? data propagates?
+make replica-status          # quick recovery + wal-receiver view
+```
+
+> ⚠️ **Notes:** replication is asynchronous (a small window of un-replicated commits can be
+> lost on failover). The replica is **read-only** — writes error out, and `pg_cron` is dormant
+> on it. Traffic is unencrypted unless you add `sslmode=require` (do this in production). v1
+> uses `wal_keep_size` rather than a slot, so a replica that's down longer than the buffer may
+> need a re-seed (`docker compose -f docker-compose.replica.yml down -v` then `make replicant`).
+> To dry-run on a single host, point `PGE_PRIMARY_HOST` at your host's published `5432` and set
+> a different `PGE_REPLICA_PORT`.
 
 ## Design
 

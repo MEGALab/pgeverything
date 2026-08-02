@@ -1,0 +1,44 @@
+# PGEverything — read-replica of a REMOTE primary. Standalone (no primary service here);
+# run on the replica host with:  make replicant   (which prompts + writes .env, then up).
+services:
+  replica:
+    build:
+      context: .
+    image: pgeverything:0.1.0
+    container_name: pgeverything-replica
+    environment:
+      # Connection to the remote primary (set by `make replicant`, persisted in .env).
+      PGE_PRIMARY_HOST: "${PGE_PRIMARY_HOST:?set PGE_PRIMARY_HOST - run make replicant}"
+      PGE_PRIMARY_PORT: "${PGE_PRIMARY_PORT:-5432}"
+      PGE_REPL_USER: "${PGE_REPL_USER:-replicator}"
+      PGE_REPL_PASSWORD: "${PGE_REPL_PASSWORD:?set PGE_REPL_PASSWORD - run make replicant}"
+      PGDATA: /home/postgres/pgdata/data
+    # Custom entrypoint clones the primary on first boot, then execs the command below.
+    entrypoint: ["bash", "/usr/local/bin/pge-replica-entrypoint.sh"]
+    # Identical -c args to the primary so shared_preload_libraries / timescaledb match.
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements
+      - -c
+      - cron.database_name=pgeverything
+      - -c
+      - timescaledb.telemetry_level=off
+      - -c
+      - shared_buffers=${PGE_SHARED_BUFFERS:-256MB}
+      - -c
+      - work_mem=${PGE_WORK_MEM:-16MB}
+      - -c
+      - max_connections=${PGE_MAX_CONNECTIONS:-100}
+    ports:
+      - "${PGE_REPLICA_PORT:-5432}:5432"
+    volumes:
+      - pgdata_replica:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pgeverything"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+volumes:
+  pgdata_replica:
