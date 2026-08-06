@@ -15,11 +15,18 @@ services:
       PGE_JWT_SECRET: ${PGE_JWT_SECRET:-CHANGE-ME-INSECURE-DEV-SECRET}
       # Optional: set to enable direct logins as the non-superuser app_user role.
       PGE_APP_USER_PASSWORD: ${PGE_APP_USER_PASSWORD:-}
+      # pgvault root key — read at startup by pgsodium's getkey script (kept out of the DB).
+      # Generate with: openssl rand -hex 32. Unset uses an INSECURE dev key.
+      PGE_VAULT_KEY: ${PGE_VAULT_KEY:-}
     # shared_preload_libraries must be set at startup (and during init), so pass it here.
     command:
       - postgres
       - -c
-      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements
+      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements,pgsodium
+      - -c
+      # Passed here (not just in conf.d) so pgsodium finds its key script during the
+      # first-boot init temp server — otherwise it aborts on the default missing path.
+      - pgsodium.getkey_script=/usr/local/bin/pgsodium_getkey.sh
       - -c
       - cron.database_name=pgeverything   # must equal POSTGRES_DB above
       - -c

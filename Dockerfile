@@ -24,14 +24,17 @@ ARG AGE_REF=PG16/v1.5.0-rc0
 ARG PGMQ_REF=v1.4.4
 # pgjwt has no release tags; pin to a commit on master.
 ARG PGJWT_REF=f3d82fd30151e754e19ce5d6a06c71c20689ce3d
+# pgsodium (libsodium AEAD, server-key model). Pin a release tag.
+ARG PGSODIUM_REF=v3.1.9
 
 # postgresql-server-dev-16 supplies the server headers (postgres.h, PGXS). The HA
 # base ships the server binaries but NOT these headers; without it AGE/pgmq can't
 # compile. PGDG's dev package matches the installed server version exactly (same ABI).
+# libsodium-dev is needed to compile pgsodium.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential git ca-certificates flex bison \
+        build-essential git ca-certificates flex bison curl \
         libreadline-dev zlib1g-dev pkg-config \
-        postgresql-server-dev-16 \
+        postgresql-server-dev-16 libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # The base image's pg_config drives install prefix + server ABI. Build against it so
@@ -59,15 +62,33 @@ RUN git clone https://github.com/michelp/pgjwt.git /tmp/pgjwt \
  && git checkout "${PGJWT_REF}" \
  && make PG_CONFIG="$(command -v pg_config)" install
 
+# --- pgsodium (libsodium authenticated encryption; C/PGXS, needs libsodium) ---
+RUN git clone --depth 1 --branch "${PGSODIUM_REF}" https://github.com/michelp/pgsodium.git /tmp/pgsodium \
+ && cd /tmp/pgsodium \
+ && make PG_CONFIG="$(command -v pg_config)" \
+ && make PG_CONFIG="$(command -v pg_config)" install
+
+# --- EFF long wordlist (schema-user 12-word passphrases). Normalize to one word per line. ---
+RUN mkdir -p /out \
+ && curl -fsSL https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt \
+      | awk '{print $2}' > /out/eff_large_wordlist.txt \
+ && test -s /out/eff_large_wordlist.txt
+
 ##############################################################################
 # Stage 2 — final image
 ##############################################################################
 FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.title="PGEverything" \
-      org.opencontainers.image.description="One Postgres for SQL, documents, graph, time-series, pub/sub, vectors, and key-value cache." \
+      org.opencontainers.image.description="One Postgres for SQL, documents, graph, time-series, pub/sub, vectors, key-value cache, and encrypted secrets." \
       org.opencontainers.image.version="0.1.0"
 
-# Copy compiled extension artifacts (AGE + pgmq) from the builder. The lib and
+# pgsodium links libsodium at runtime — install the runtime lib in the final image.
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends libsodium23 \
+    && rm -rf /var/lib/apt/lists/*
+USER postgres
+
+# Copy compiled extension artifacts (AGE + pgmq + pgsodium) from the builder. The lib and
 # extension dirs are the standard PG16 install locations on this base.
 COPY --from=builder /usr/lib/postgresql/16/lib/ /usr/lib/postgresql/16/lib/
 COPY --from=builder /usr/share/postgresql/16/extension/ /usr/share/postgresql/16/extension/
@@ -79,6 +100,13 @@ COPY extensions/pgcache/pgcache.control extensions/pgcache/pgcache--0.1.0.sql \
 # pgauth — first-party JWT auth + RLS helper extension (pure SQL, no compile).
 COPY extensions/pgauth/pgauth.control extensions/pgauth/pgauth--0.1.0.sql \
      /usr/share/postgresql/16/extension/
+
+# pgvault — first-party encrypted secrets manager (pure SQL; needs pgsodium + pgcrypto).
+COPY extensions/pgvault/pgvault.control extensions/pgvault/pgvault--0.1.0.sql \
+     /usr/share/postgresql/16/extension/
+
+# EFF diceware wordlist for schema-user passphrases (make user-create).
+COPY --from=builder /out/eff_large_wordlist.txt /usr/share/pgeverything/eff_large_wordlist.txt
 
 # Init scripts + config.
 COPY rootfs/ /

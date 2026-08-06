@@ -8,7 +8,12 @@ NEW_USER     ?=
 NEW_PASSWORD ?=
 
 .PHONY: build up down logs shell smoke clean create-db \
-        replication-enable replicant replicant-smoke replica-status
+        replication-enable replicant replicant-smoke replica-status \
+        secrets-init secrets-create secret-read secrets-update secret-delete \
+        secret-user-create secret-user-deactivate secret-user-passwd \
+        secret-red-alert secret-stand-down secrets-smoke \
+        user-create user-read user-update-password user-deactivate user-delete \
+        database-create
 
 build:            ## Build the image
 	docker build -t $(IMAGE) .
@@ -60,3 +65,43 @@ replica-status:     ## Quick replication status (recovery + wal receiver)
 	  psql -x -U postgres -d pgeverything \
 	  -c "SELECT pg_is_in_recovery() AS in_recovery;" \
 	  -c "SELECT status, sender_host, sender_port, conninfo IS NOT NULL AS has_conninfo FROM pg_stat_wal_receiver;"
+
+# --- Secrets vault (pgvault). All honor DB ?= to target any database. See README. --------
+secrets-init:            ## Set up the vault; prompts for the DB, autogenerates the admin UUID + passphrase
+	@bash scripts/secrets.sh init
+secrets-create:          ## Add a secret (prompts for a write/both user + the secret)
+	@bash scripts/secrets.sh create
+secret-read:             ## Reveal a secret's plaintext by UUID (prompts for a read/both user)
+	@bash scripts/secrets.sh read
+secrets-update:          ## Update a secret by UUID (prompts)
+	@bash scripts/secrets.sh update
+secret-delete:           ## Delete a secret by UUID (prompts)
+	@bash scripts/secrets.sh delete
+secret-user-create:      ## Admin creates a read/write/both user (autogen creds; prompts)
+	@bash scripts/secrets.sh user-create
+secret-user-deactivate:  ## Admin deactivates a secrets user (prompts)
+	@bash scripts/secrets.sh user-deactivate
+secret-user-passwd:      ## Change a user's password (prompts: user, current, new)
+	@bash scripts/secrets.sh user-passwd
+secret-red-alert:        ## Admin locks the entire vault (prompts)
+	@bash scripts/secrets.sh red-alert
+secret-stand-down:       ## Admin reactivates the vault (prompts)
+	@bash scripts/secrets.sh stand-down
+secrets-smoke:           ## Verify the vault end-to-end on an ephemeral DB — separate from `smoke`
+	@bash scripts/secrets-smoke.sh
+
+# --- Schema-scoped users (real Postgres roles). Each prompts for the target database. -----
+user-create:          ## Create a schema user (prompts db + schema; autogen UUID + passphrase)
+	@bash scripts/users.sh create
+user-read:            ## Show a schema user's record (prompts db + user id)
+	@bash scripts/users.sh read
+user-update-password: ## Set a schema user's password (prompts db + user id + new password)
+	@bash scripts/users.sh update-password
+user-deactivate:      ## Lock a schema user out (random undisclosed passphrase; keeps data)
+	@bash scripts/users.sh deactivate
+user-delete:          ## Delete a schema user + all its objects in the DB (prompts, confirms)
+	@bash scripts/users.sh delete
+
+# --- Databases -------------------------------------------------------------------------
+database-create:      ## Create a new database + bootstrap its admin user (prompts)
+	@bash scripts/database-create.sh
