@@ -1,0 +1,5 @@
+comment = 'Encrypted secrets vault (pgsodium AEAD) with app-level RBAC for PGEverything.'
+default_version = '0.1.0'
+relocatable = false
+superuser = false
+requires = 'pgcrypto, pgsodium'

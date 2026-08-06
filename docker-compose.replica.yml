@@ -13,13 +13,18 @@ services:
       PGE_REPL_USER: "${PGE_REPL_USER:-replicator}"
       PGE_REPL_PASSWORD: "${PGE_REPL_PASSWORD:?set PGE_REPL_PASSWORD - run make replicant}"
       PGDATA: /home/postgres/pgdata/data
+      # Must match the primary so pgsodium can decrypt replicated vault secrets.
+      PGE_VAULT_KEY: "${PGE_VAULT_KEY:-}"
     # Custom entrypoint clones the primary on first boot, then execs the command below.
     entrypoint: ["bash", "/usr/local/bin/pge-replica-entrypoint.sh"]
     # Identical -c args to the primary so shared_preload_libraries / timescaledb match.
     command:
       - postgres
       - -c
-      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements
+      - shared_preload_libraries=timescaledb,age,pg_cron,pg_stat_statements,pgsodium
+      - -c
+      # Match the primary: pgsodium needs its key script path set at startup too.
+      - pgsodium.getkey_script=/usr/local/bin/pgsodium_getkey.sh
       - -c
       - cron.database_name=pgeverything
       - -c
