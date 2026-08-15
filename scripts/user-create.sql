@@ -2,9 +2,14 @@
 --   psql ... -v uuid=<role> -v pass=<passphrase> -v schema=<schema> -f -
 -- The role is scoped: it may use the one schema and CRUD its tables, nothing cluster-wide.
 
+-- Guard: the target schema must exist. psql does NOT interpolate :'schema' inside a $$ … $$
+-- block, so stash it into a session setting out here (where interpolation works, and psql
+-- safely quotes it) and read it back with current_setting() inside the block below.
+SELECT set_config('pgusers.new_schema', :'schema', false);
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = :'schema') THEN
-    RAISE EXCEPTION 'schema % does not exist in this database', :'schema';
+  IF NOT EXISTS (SELECT 1 FROM information_schema.schemata
+                 WHERE schema_name = current_setting('pgusers.new_schema')) THEN
+    RAISE EXCEPTION 'schema "%" does not exist in this database', current_setting('pgusers.new_schema');
   END IF;
 END $$;
 
