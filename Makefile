@@ -2,18 +2,19 @@ IMAGE   ?= pgeverything:0.1.0
 DB      ?= pgeverything
 PSQL     = docker compose exec -T pgeverything psql -v ON_ERROR_STOP=1 -U postgres -d $(DB)
 
-# Args for `make create-db` (override on the command line).
-NEW_DB       ?=
-NEW_USER     ?=
-NEW_PASSWORD ?=
+# Args for `make database-create` (pass on the command line; DB_USER must already exist).
+DB_NAME      ?=
+SCHEMA_NAME  ?=
+DB_USER      ?=
+DB_PASSWORD  ?=
 
-.PHONY: help build up down logs shell smoke clean create-db \
+.PHONY: help build up down logs shell smoke clean database-create \
         replication-enable replicant replicant-smoke replica-status \
         secrets-init secrets-create secret-read secrets-update secret-delete \
         secret-user-create secret-user-deactivate secret-user-passwd \
         secret-red-alert secret-stand-down secrets-smoke \
         user-create user-read user-update-password user-deactivate user-delete \
-        database-create
+        tenant-create
 
 help:             ## Show this help — all commands, grouped by section
 	@printf '\nPGEverything — available \033[36mmake\033[0m targets:\n'
@@ -44,16 +45,8 @@ smoke: up         ## Run the nine-capability smoke suite
 clean:            ## Remove container + data volume
 	docker compose down -v
 
-create-db:        ## Create an isolated tenant DB + owner role: make create-db NEW_DB=x NEW_USER=y NEW_PASSWORD=z
-	@test -n "$(NEW_DB)"       || { echo "Usage: make create-db NEW_DB=<db> NEW_USER=<user> NEW_PASSWORD=<pw>"; exit 1; }
-	@test -n "$(NEW_USER)"     || { echo "Usage: make create-db NEW_DB=<db> NEW_USER=<user> NEW_PASSWORD=<pw>"; exit 1; }
-	@test -n "$(NEW_PASSWORD)" || { echo "Usage: make create-db NEW_DB=<db> NEW_USER=<user> NEW_PASSWORD=<pw>"; exit 1; }
-	@# Pipe the provisioning script via stdin (-f -): psql only interpolates :vars for
-	@# file/stdin input, not for -c strings. See scripts/create-db.sql for the isolation.
-	docker compose exec -T pgeverything psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
-	  -v user="$(NEW_USER)" -v pass="$(NEW_PASSWORD)" -v db="$(NEW_DB)" -v maindb="$(DB)" \
-	  -f - < scripts/create-db.sql
-	@echo "Created isolated database '$(NEW_DB)' owned by '$(NEW_USER)' — no access to other databases."
+database-create:  ## Grant an EXISTING user on a DB + schema (creates DB/schema if missing): DB_NAME=x SCHEMA_NAME=y DB_USER=u DB_PASSWORD=p
+	@bash scripts/database-create.sh
 
 # --- Physical replication (see README "Physical replication") -------------------------
 replication-enable: ## (PRIMARY host) authorize a replica: role + pg_hba + wal_keep_size
@@ -108,5 +101,5 @@ user-delete:          ## Delete a schema user + all its objects in the DB (promp
 	@bash scripts/users.sh delete
 
 # --- Databases -------------------------------------------------------------------------
-database-create:      ## Create a new database + bootstrap its admin user (prompts)
-	@bash scripts/database-create.sh
+tenant-create:        ## Create a new database + bootstrap its admin user (prompts)
+	@bash scripts/tenant-create.sh

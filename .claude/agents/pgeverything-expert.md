@@ -54,8 +54,9 @@ user** management, and **database provisioning**.
 Prefer these over hand-rolled SQL for lifecycle tasks:
 
 - Build/run: `make build`, `make up`, `make down`, `make shell`, `make smoke` (9-capability check)
-- Databases: `make create-db NEW_DB=… NEW_USER=… NEW_PASSWORD=…` (isolated tenant + locked-down
-  owner) · `make database-create` (new DB + auto-generated per-DB admin that owns it)
+- Databases: `make database-create DB_NAME=… SCHEMA_NAME=… DB_USER=… DB_PASSWORD=…` (grant an
+  EXISTING user on a DB+schema, creating them if missing; verifies the password, never creates the
+  user) · `make tenant-create` (new DB + auto-generated per-DB admin that owns it)
 - Schema users (real roles, UUID name + 12-word passphrase): `make user-create` / `user-read` /
   `user-update-password` / `user-deactivate` / `user-delete`
 - Secrets vault: `make secrets-init` (bootstrap per-DB), `make secret-user-create`,

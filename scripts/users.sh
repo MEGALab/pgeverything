@@ -5,7 +5,7 @@
 #
 # Every subcommand prompts for the target DATABASE (roles are cluster-global, but the schema
 # grants + registry are per-DB). `create` also prompts for the schema. Feature 3
-# (database-create) pre-fills USER_DB / USER_SCHEMA / USER_ADMIN to skip prompts.
+# (tenant-create) pre-fills USER_DB / USER_SCHEMA / USER_ADMIN to skip prompts.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
