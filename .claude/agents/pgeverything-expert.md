@@ -42,6 +42,7 @@ primary database, these extensions/capabilities:
 | Users + per-row access control | **pgauth** (JWT) + **Row-Level Security** | `auth.register/login/authenticate`, policies on `auth.uid()` |
 | Secrets / API keys / credentials | **pgvault** (pgsodium AEAD) | Encrypted at rest; key kept out of the DB; app-level RBAC |
 | Geospatial | **PostGIS** (optional) | Enable with `PGE_ENABLE_POSTGIS=true` |
+| Large/time-series tables outgrowing a single table | **pg_partman** (`partman.create_parent/run_maintenance_proc`) | Range/list partitioning; auto premake + retention via `pg_cron` (hourly), not the bgw |
 | Scheduled SQL | **pg_cron** | `cron.schedule(...)` |
 | Hashing / UUIDs | **pgcrypto**, **uuid-ossp** | `crypt`, `gen_salt('bf')`, `gen_random_uuid()` |
 | Query insight | **pg_stat_statements** | Always-on profiling |

@@ -15,6 +15,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgjwt;            -- JWT sign/verify (requires pgcrypto)
 CREATE EXTENSION IF NOT EXISTS pgauth;           -- JWT auth + RLS helpers (requires pgjwt)
 
+-- pg_partman — partition management (range/list) for large/time-series tables. Isolated in
+-- its own schema per upstream convention (it owns a part_config registry table + many helpers).
+CREATE SCHEMA IF NOT EXISTS partman;
+CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman;
+
 -- Non-superuser application role. RLS only enforces for non-superusers, so apps must
 -- connect (or SET ROLE) as this role; the secret table stays invisible to it.
 -- Enable LOGIN + a password at first boot via PGE_APP_USER_PASSWORD (see 20-auth.sh).
@@ -59,3 +64,10 @@ END $$;
 SELECT cron.schedule('pgcache-vacuum',       '0 4 * * *',  $$VACUUM (ANALYZE) pgcache.store$$);
 -- Once-daily hour bump → true 25h spacing between vacuums.
 SELECT cron.schedule('pgcache-vacuum-drift', '30 4 * * *', $$SELECT pgcache.drift_vacuum_hour()$$);
+
+-- pg_partman maintenance: create the next premade partition(s) and apply retention for every
+-- partition set registered via partman.create_parent(). We run this via pg_cron rather than the
+-- optional pg_partman_bgw worker (no shared_preload_libraries entry, no restart on setup).
+-- Hourly matches pg_partman's own bgw default interval — tune down if you register a partition
+-- set with a sub-hour interval.
+SELECT cron.schedule('partman-maintenance', '0 * * * *', $$CALL partman.run_maintenance_proc()$$);

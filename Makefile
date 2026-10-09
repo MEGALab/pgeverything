@@ -39,7 +39,7 @@ logs:             ## Tail logs
 shell:            ## psql into the database
 	docker compose exec pgeverything psql -U postgres -d $(DB)
 
-smoke: up         ## Run the nine-capability smoke suite
+smoke: up         ## Run the ten-capability smoke suite
 	$(PSQL) -f - < test/smoke.sql
 
 clean:            ## Remove container + data volume
