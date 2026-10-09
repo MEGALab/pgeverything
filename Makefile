@@ -8,7 +8,7 @@ SCHEMA_NAME  ?=
 DB_USER      ?=
 DB_PASSWORD  ?=
 
-.PHONY: help build up down logs shell smoke clean database-create \
+.PHONY: help provision build up down logs shell smoke clean database-create \
         replication-enable replicant replicant-smoke replica-status \
         secrets-init secrets-create secret-read secrets-update secret-delete \
         secret-user-create secret-user-deactivate secret-user-passwd \
@@ -20,6 +20,9 @@ help:             ## Show this help — all commands, grouped by section
 	@printf '\nPGEverything — available \033[36mmake\033[0m targets:\n'
 	@awk 'BEGIN {FS="## "; printf "\n\033[1mGeneral\033[0m\n"} /^# --- / {s=$$0; sub(/^# --- /,"",s); sub(/[ -]+$$/,"",s); printf "\n\033[1m%s\033[0m\n",s; next} /^[a-zA-Z0-9_-]+:.*## / {t=$$1; sub(/:.*/,"",t); printf "  \033[36m%-24s\033[0m %s\n",t,$$2}' $(MAKEFILE_LIST)
 	@printf '\nMost targets accept \033[36mDB=<name>\033[0m to target another database. See the README for details.\n\n'
+
+provision:        ## Wipe + recreate .env from .env.example with fresh random secrets (destructive; backs up old .env to .env.bak)
+	@bash scripts/provision.sh
 
 build:            ## Build the image
 	docker build -t $(IMAGE) .
