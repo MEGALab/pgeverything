@@ -4,8 +4,8 @@
 
 Instead of running nine databases and services — Postgres, MongoDB, Neo4j, InfluxDB, Redis,
 Pinecone, Elasticsearch, Auth0, plus a cache — PGEverything gives you one PostgreSQL server,
-one port, nine workloads. Everything is a Postgres extension, so it is all transactional,
-backed up together, and queried in one SQL dialect.
+one port, and the ten workloads below. Everything is a Postgres extension, so it is all
+transactional, backed up together, and queried in one SQL dialect.
 
 | Capability | Powered by |
 |---|---|
@@ -18,6 +18,7 @@ backed up together, and queried in one SQL dialect.
 | **Key-value cache** | pgcache (jsonb values, TTL) |
 | **Full-text search** | core tsvector + GIN |
 | **Auth / RLS** | pgauth (JWT via pgjwt) + Row-Level Security |
+| **Partitioning** | pg_partman (range/list, auto-maintained via `pg_cron`) |
 
 Plus `pg_cron`, `pg_trgm`, `pgcrypto`, `pgjwt`, `pg_stat_statements`, and optional **PostGIS**.
 
@@ -137,6 +138,19 @@ CREATE TABLE articles (
 );
 CREATE INDEX ON articles USING gin (fts);
 SELECT id FROM articles WHERE fts @@ to_tsquery('english', 'quick & fox');
+```
+
+**Partitioning (pg_partman)**
+```sql
+CREATE TABLE events (id bigserial, ts timestamptz NOT NULL, body jsonb) PARTITION BY RANGE (ts);
+SELECT partman.create_parent(
+  p_parent_table => 'public.events',
+  p_control      => 'ts',
+  p_interval     => '1 day'
+);
+-- premade future partitions + retention run automatically (pg_cron, hourly — see
+-- rootfs/docker-entrypoint-initdb.d/00-extensions.sql). To run it by hand:
+CALL partman.run_maintenance_proc();
 ```
 
 ## Authentication & Row-Level Security

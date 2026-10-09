@@ -83,8 +83,11 @@ LABEL org.opencontainers.image.title="PGEverything" \
       org.opencontainers.image.version="0.1.0"
 
 # pgsodium links libsodium at runtime — install the runtime lib in the final image.
+# pg_partman (PGDG package) — partition management (range/list) for large/time-series tables.
+# Pure SQL + a config table; no shared_preload_libraries needed (maintenance runs via pg_cron,
+# not the optional pg_partman_bgw background worker).
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends libsodium23 \
+RUN apt-get update && apt-get install -y --no-install-recommends libsodium23 postgresql-16-partman \
     && rm -rf /var/lib/apt/lists/*
 USER postgres
 
