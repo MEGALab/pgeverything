@@ -350,6 +350,21 @@ The agent definition lives at
 explicitly — e.g. *"use the pgeverything-expert to design storage for a multi-tenant chat app
 with message search and per-user embeddings."*
 
+### Database Administrator agent (shared across projects)
+
+[.claude/agents/pgeverything-database-admin.md](.claude/agents/pgeverything-database-admin.md) is
+a second, project-agnostic subagent — *PGEverything Database Administrator*. Where the expert
+designs storage for the task at hand, the DBA is built to be dropped into **any** project that
+uses PGEverything: it discovers the server and the consuming project, walks an 18-point checklist
+of every PGEverything capability (SQL, JSONB, graph, time-series, queues, vectors, cache,
+full-text, auth/RLS, secrets, partitioning, cron, PostGIS, replication, backups…) to **recommend**
+what to use and what to drop, then builds, verifies and operates it — tuning, monitoring, backup
+and restore, replication, upgrades and a security audit of PGEverything's dev defaults. It finds
+this repo's `make` targets from outside via `make -C <repo>` (or `$PGEVERYTHING_HOME`).
+
+Install it the same way as the expert (`cp .claude/agents/pgeverything-database-admin.md
+~/.claude/agents/` for every project on your machine, or into another repo's `.claude/agents/`).
+
 ## Design
 
 Built on `timescale/timescaledb-ha:pg16` (which bundles TimescaleDB + pgvector +
